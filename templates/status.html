@@ -1,28 +1,28 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- Container principal para centralizar todo o conteúdo e definir uma largura máxima -->
+<!-- Container principal -->
 <div class="container mx-auto max-w-7xl px-4">
 
-  <!-- Bloco de Título da Página -->
+  <!-- Título da Página -->
   <div class="my-6">
     <h1 class="text-3xl font-bold text-gray-800">{{ title or "Dashboard" }}</h1>
     <p class="text-gray-500">{{ subtitle or "Visão geral do sistema" }}</p>
   </div>
 
-  <!-- Layout de duas colunas para filtros e dashboard -->
+  <!-- Layout de duas colunas -->
   <div class="flex flex-col lg:flex-row gap-6">
 
     <!-- Coluna de Filtros (Esquerda) -->
-    <aside class="w-full lg:w-72 bg-white p-6 rounded-xl shadow-lg h-fit">
+    <aside class="w-full lg:w-72 bg-white p-6 rounded-xl shadow-lg h-fit flex-shrink-0">
       <h3 class="font-bold text-lg text-gray-800 mb-4 border-b border-gray-200 pb-2">Filtros</h3>
-      <form id="statusForm" method="GET" action="{{ url_for('status_page') }}" class="space-y-4">
+      <form id="filterForm" method="GET" action="{{ url_for('status_page') }}" class="space-y-4">
         
-        <!-- Dropdowns de filtro (Unidade, Processo, etc.) -->
+        <!-- Dropdowns -->
         <div>
           <label for="unidade" class="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
           <select id="unidade" name="unidade" class="w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-            <option value="">Todas</option>
+            <option value="">Selecione</option>
             {% for unity in unities %}
               <option value="{{ unity }}" {% if selected_values.unidade == unity %}selected{% endif %}>{{ unity }}</option>
             {% endfor %}
@@ -31,7 +31,7 @@
         <div>
           <label for="processo" class="block text-sm font-medium text-gray-700 mb-1">Processo</label>
           <select id="processo" name="processo" class="w-full p-2 rounded-md" {% if not selected_values.unidade %}disabled{% endif %}>
-            <option value="">Todos</option>
+            <option value="">Selecione</option>
             {% for process in processes %}
               <option value="{{ process }}" {% if selected_values.processo == process %}selected{% endif %}>{{ process }}</option>
             {% endfor %}
@@ -40,7 +40,7 @@
         <div>
           <label for="transportador" class="block text-sm font-medium text-gray-700 mb-1">Transportador</label>
           <select id="transportador" name="transportador" class="w-full p-2 rounded-md" {% if not selected_values.processo %}disabled{% endif %}>
-            <option value="">Todos</option>
+            <option value="">Selecione</option>
             {% for transporter in transporters %}
               <option value="{{ transporter }}" {% if selected_values.transportador == transporter %}selected{% endif %}>{{ transporter }}</option>
             {% endfor %}
@@ -49,19 +49,43 @@
         <div>
           <label for="tambor" class="block text-sm font-medium text-gray-700 mb-1">Tambor</label>
           <select id="tambor" name="tambor" class="w-full p-2 rounded-md" {% if not selected_values.transportador %}disabled{% endif %}>
-            <option value="">Todos</option>
+            <option value="">Selecione</option>
             {% for barrel in barrels %}
               <option value="{{ barrel }}" {% if selected_values.tambor == barrel %}selected{% endif %}>{{ barrel }}</option>
             {% endfor %}
           </select>
         </div>
-
       </form>
+
+      <!-- Seção de Ações -->
+      {% if selected_values.tambor %}
+      <div class="mt-6 pt-4 border-t">
+        <h3 class="font-bold text-lg text-gray-800 mb-4">Ações</h3>
+        <form action="{{ url_for('remove_barrel') }}" method="POST" onsubmit="return confirm('Tem certeza que deseja remover este tambor? Esta ação não pode ser desfeita.');">
+            <input type="hidden" name="unidade" value="{{ selected_values.unidade }}">
+            <input type="hidden" name="processo" value="{{ selected_values.processo }}">
+            <input type="hidden" name="transportador" value="{{ selected_values.transportador }}">
+            <input type="hidden" name="tambor" value="{{ selected_values.tambor }}">
+            <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out">
+                Remover Tambor
+            </button>
+        </form>
+      </div>
+      {% endif %}
     </aside>
 
     <!-- Conteúdo Principal (Direita) -->
     <main class="flex-1 space-y-6">
-        <!-- Exibe a mensagem de erro, se houver -->
+        <!-- Mensagens e Erros -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="p-4 rounded-md {% if category == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}" role="alert">
+                        <span class="font-medium">{{ message }}</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
         {% if error %}
             <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl" role="alert">
                 <strong class="font-bold">Erro!</strong>
@@ -69,48 +93,50 @@
             </div>
         {% endif %}
       
-        <!-- Cards de Contagem Geral (Sempre visíveis) -->
+        <!-- Cards de Contagem Geral -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {% set stats = dashboard_data.general_stats if dashboard_data and dashboard_data.general_stats else {} %}
             <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center text-center">
-                <span class="text-5xl font-bold text-gray-800">{{ dashboard_data.process_count or 0 }}</span>
+                <span class="text-5xl font-bold text-gray-800">{{ stats.unity_count or 0 }}</span>
+                <span class="text-md text-gray-500 mt-2">Unidades</span>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center text-center">
+                <span class="text-5xl font-bold text-gray-800">{{ stats.process_count or 0 }}</span>
                 <span class="text-md text-gray-500 mt-2">Processos</span>
             </div>
             <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center text-center">
-                <span class="text-5xl font-bold text-gray-800">{{ dashboard_data.transporter_count or 0 }}</span>
+                <span class="text-5xl font-bold text-gray-800">{{ stats.transporter_count or 0 }}</span>
                 <span class="text-md text-gray-500 mt-2">Transportadores</span>
             </div>
             <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center text-center">
-                <span class="text-5xl font-bold text-gray-800">{{ dashboard_data.barrel_count or 0 }}</span>
+                <span class="text-5xl font-bold text-gray-800">{{ stats.barrel_count or 0 }}</span>
                 <span class="text-md text-gray-500 mt-2">Tambores</span>
-            </div>
-            <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center text-center">
-                <span class="text-5xl font-bold text-gray-800">{{ dashboard_data.plate_count or 0 }}</span>
-                <span class="text-md text-gray-500 mt-2">Placas</span>
             </div>
         </div>
 
-        <!-- Cards de Espessura (Sempre visíveis) -->
+        <!-- Cards de Espessura -->
         <div class="bg-white p-6 rounded-xl shadow-lg">
-            <h3 class="font-bold text-center text-md uppercase text-gray-600 mb-4">Espessura dos Revestimentos dos Tambores</h3>
+            <h3 class="font-bold text-center text-md uppercase text-gray-600 mb-4">Espessura dos Revestimentos</h3>
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 text-white">
+                {% set thickness = dashboard_data.thickness_counts if dashboard_data else {} %}
                 <div class="bg-green-600 p-4 rounded-lg flex flex-col items-center justify-center">
-                    <span class="text-4xl font-bold">{{ dashboard_data.thickness_counts.get(10, 0) if dashboard_data else 0 }}</span>
+                    <span class="text-4xl font-bold">{{ thickness.get(10, 0) }}</span>
                     <span class="text-sm font-light">&gt;10mm</span>
                 </div>
                 <div class="bg-yellow-500 p-4 rounded-lg flex flex-col items-center justify-center">
-                    <span class="text-4xl font-bold">{{ dashboard_data.thickness_counts.get(8, 0) if dashboard_data else 0 }}</span>
+                    <span class="text-4xl font-bold">{{ thickness.get(8, 0) }}</span>
                     <span class="text-sm font-light">&lt;10mm</span>
                 </div>
                 <div class="bg-orange-400 p-4 rounded-lg flex flex-col items-center justify-center">
-                    <span class="text-4xl font-bold">{{ dashboard_data.thickness_counts.get(5, 0) if dashboard_data else 0 }}</span>
+                    <span class="text-4xl font-bold">{{ thickness.get(5, 0) }}</span>
                     <span class="text-sm font-light">&lt;8mm</span>
                 </div>
                 <div class="bg-red-600 p-4 rounded-lg flex flex-col items-center justify-center">
-                    <span class="text-4xl font-bold">{{ dashboard_data.thickness_counts.get(0, 0) if dashboard_data else 0 }}</span>
+                    <span class="text-4xl font-bold">{{ thickness.get(0, 0) }}</span>
                     <span class="text-sm font-light">&lt;5mm</span>
                 </div>
                 <div class="bg-gray-800 p-4 rounded-lg flex flex-col items-center justify-center col-span-2 lg:col-span-1">
-                    <span class="text-4xl font-bold">{{ dashboard_data.thickness_counts.get(-1, 0) if dashboard_data else 0 }}</span>
+                    <span class="text-4xl font-bold">{{ thickness.get(-1, 0) }}</span>
                     <span class="text-sm font-light">Erro de Leitura</span>
                 </div>
             </div>
@@ -122,14 +148,11 @@
             <div id="map" class="w-full h-96 bg-gray-200 rounded-lg"></div>
         </div>
         
-        <!-- Detalhes do Tambor e Placas -->
+        <!-- Detalhes do Tambor e Placas (Apenas se um tambor for selecionado) -->
+        {% if selected_values.tambor and dashboard_data and dashboard_data.plates_details %}
         <div class="bg-white p-6 rounded-xl shadow-lg">
             <h3 class="font-bold text-center text-md uppercase text-gray-600 mb-4">
-              {% if selected_values.tambor %}
                 Detalhes do Tambor: {{ selected_values.tambor }}
-              {% else %}
-                Detalhes dos Tambores
-              {% endif %}
             </h3>
             <div class="flex flex-col md:flex-row gap-6">
                 <!-- Coluna da Lista de Placas -->
@@ -142,40 +165,18 @@
                             <span class="font-bold text-center">Seção 3</span>
                         </div>
                         <div id="plate-list" class="space-y-1">
-                            {% if dashboard_data and dashboard_data.plates_details %}
-                                <!-- Renderiza com dados reais da API -->
-                                {% for plate in dashboard_data.plates_details %}
-                                    {% set min_thickness = (plate.secoes.values() | list) | min %}
-                                    <div class="plate-row grid grid-cols-4 gap-3 px-3 border border-gray-400 p-2 rounded-lg cursor-pointer hover:bg-gray-100" data-plate-code="{{ plate.codigo or plate.placa }}">
-                                        <span class="self-center font-bold {{ plate_styles[min_thickness]['text'] }}">{{ plate.codigo or plate.placa }}</span>
-                                        {% for secao, espessura in plate.secoes.items() %}
-                                        <div class="flex justify-center items-center border-2 {{ plate_styles[espessura]['border'] }} p-1 rounded-lg text-center">
-                                            <span class="{{ plate_styles[espessura]['text'] }}">{{ plate_styles[espessura]['label'] }}</span>
-                                        </div>
-                                        {% endfor %}
+                            {% for plate in dashboard_data.plates_details %}
+                                {% set min_thickness = (plate.secoes.values() | list | min) if plate.secoes else -1 %}
+                                {% set plate_code = plate.get('codigo') or plate.get('placa') %}
+                                <div class="plate-row grid grid-cols-4 gap-3 px-3 border border-gray-400 p-2 rounded-lg cursor-pointer hover:bg-gray-100" data-plate-code="{{ plate_code }}">
+                                    <span class="self-center font-bold {{ plate_styles[min_thickness]['text'] }}">{{ plate_code }}</span>
+                                    {% for secao, espessura in plate.secoes.items() %}
+                                    <div class="flex justify-center items-center border-2 {{ plate_styles[espessura]['border'] }} p-1 rounded-lg text-center">
+                                        <span class="{{ plate_styles[espessura]['text'] }}">{{ plate_styles[espessura]['label'] }}</span>
                                     </div>
-                                {% endfor %}
-                            {% else %}
-                                <!-- Renderiza com dados de EXEMPLO para avaliação do layout -->
-                                <div class="plate-row grid grid-cols-4 gap-3 px-3 border border-gray-400 p-2 rounded-lg cursor-pointer hover:bg-gray-100" data-plate-code="PLACA-01">
-                                    <span class="self-center font-bold text-green-600">PLACA-01</span>
-                                    <div class="flex justify-center items-center border-2 border-green-600 p-1 rounded-lg text-center"><span class="text-green-600">&gt;10mm</span></div>
-                                    <div class="flex justify-center items-center border-2 border-green-600 p-1 rounded-lg text-center"><span class="text-green-600">&gt;10mm</span></div>
-                                    <div class="flex justify-center items-center border-2 border-green-600 p-1 rounded-lg text-center"><span class="text-green-600">&gt;10mm</span></div>
+                                    {% endfor %}
                                 </div>
-                                <div class="plate-row grid grid-cols-4 gap-3 px-3 border border-gray-400 p-2 rounded-lg cursor-pointer hover:bg-gray-100" data-plate-code="PLACA-02">
-                                    <span class="self-center font-bold text-orange-400">PLACA-02</span>
-                                    <div class="flex justify-center items-center border-2 border-green-600 p-1 rounded-lg text-center"><span class="text-green-600">&gt;10mm</span></div>
-                                    <div class="flex justify-center items-center border-2 border-orange-400 p-1 rounded-lg text-center"><span class="text-orange-400">&lt;8mm</span></div>
-                                    <div class="flex justify-center items-center border-2 border-yellow-500 p-1 rounded-lg text-center"><span class="text-yellow-500">&lt;10mm</span></div>
-                                </div>
-                                <div class="plate-row grid grid-cols-4 gap-3 px-3 border border-gray-400 p-2 rounded-lg cursor-pointer hover:bg-gray-100" data-plate-code="PLACA-03">
-                                    <span class="self-center font-bold text-red-600">PLACA-03</span>
-                                    <div class="flex justify-center items-center border-2 border-red-600 p-1 rounded-lg text-center"><span class="text-red-600">&lt;5mm</span></div>
-                                    <div class="flex justify-center items-center border-2 border-orange-400 p-1 rounded-lg text-center"><span class="text-orange-400">&lt;8mm</span></div>
-                                    <div class="flex justify-center items-center border-2 border-gray-800 p-1 rounded-lg text-center"><span class="text-gray-800">Erro</span></div>
-                                </div>
-                            {% endif %}
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -185,8 +186,7 @@
                 </div>
             </div>
         </div>
-
-        
+        {% endif %}
         
     </main>
   </div>
@@ -197,52 +197,84 @@
 <script>
   // Script para submeter o formulário ao alterar os filtros
   document.addEventListener('DOMContentLoaded', function() {
-    const selects = document.querySelectorAll('#statusForm select');
+    const selects = document.querySelectorAll('#filterForm select');
     selects.forEach(select => {
       select.addEventListener('change', function() {
         this.form.submit();
       });
     });
   });
+</script>
 
-  // Script para inicializar o Google Maps
+<!-- Script do Google Maps -->
+{% if maps_api_key %}
+<script async defer src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key }}&callback=initMap"></script>
+<script>
   function initMap() {
-    const location = JSON.parse({{ location_data | safe }});
-    const defaultLocation = { lat: -18.9186, lng: -48.2772 };
-    const mapCenter = location || defaultLocation;
+    const locationData = {{ (dashboard_data.location_data if dashboard_data else 'null') | safe }};
+    const mapDiv = document.getElementById("map");
+    const defaultLocation = { lat: -14.2350, lng: -51.9253 }; // Centro do Brasil
+    
+    let mapCenter = defaultLocation;
+    let zoomLevel = 4;
+    let locations = [];
 
-    const map = new google.maps.Map(document.getElementById("map"), {
-      zoom: location ? 15 : 10,
-      center: mapCenter,
-      mapId: 'VULCAFLEX_MAP_ID'
-    });
+    if (locationData) {
+        // Se for uma lista de locais (visão geral)
+        if (Array.isArray(locationData)) {
+            locations = locationData;
+            if (locations.length > 0) {
+                mapCenter = locations[0];
+            }
+        } 
+        // Se for um único objeto (tambor selecionado)
+        else if (locationData.lat && locationData.lng) {
+            locations = [locationData];
+            mapCenter = locationData;
+            zoomLevel = 15;
+        }
+    }
+    
+    const map = new google.maps.Map(mapDiv, { zoom: zoomLevel, center: mapCenter });
 
-    if (location) {
-      new google.maps.Marker({
-        position: mapCenter,
-        map: map,
-        title: "Localização do Tambor",
-      });
+    if (locations.length > 0) {
+        const bounds = new google.maps.LatLngBounds();
+        locations.forEach(loc => {
+            if (loc.lat && loc.lng) {
+                const marker = new google.maps.Marker({ position: loc, map: map, title: loc.title || '' });
+                bounds.extend(marker.getPosition());
+            }
+        });
+        
+        if (locations.length > 1) {
+            map.fitBounds(bounds);
+        } else {
+            map.setCenter(bounds.getCenter());
+            map.setZoom(15);
+        }
     }
   }
 </script>
-<script async defer src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key }}&callback=initMap"></script>
+{% else %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const mapDiv = document.getElementById("map");
+        if (mapDiv) {
+            mapDiv.innerHTML = '<div class="h-full flex items-center justify-center"><p class="text-center text-gray-500">A chave da API do Google Maps não foi configurada.</p></div>';
+        }
+    });
+</script>
+{% endif %}
 
-<!-- Script do Gráfico de Barras -->
+
+<!-- SCRIPT DO GRÁFICO DE BARRAS (RESTAURADO) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const plateChartCanvas = document.getElementById('plateChart');
         if (!plateChartCanvas) return;
 
-        // Tenta obter dados reais. Se não existirem, usa dados de exemplo.
-        const hasRealData = {{ 'true' if (dashboard_data and dashboard_data.plates_details) else 'false' }};
-        const chartData = hasRealData ? JSON.parse({{ chart_data | safe }}) : {
-            "PLACA-01": { "labels": ["Seção 1", "Seção 2", "Seção 3"], "values": [5, 5, 5], "colors": ["#16a34a", "#16a34a", "#16a34a"] },
-            "PLACA-02": { "labels": ["Seção 1", "Seção 2", "Seção 3"], "values": [5, 3, 4], "colors": ["#16a34a", "#fb923c", "#eab308"] },
-            "PLACA-03": { "labels": ["Seção 1", "Seção 2", "Seção 3"], "values": [2, 3, 1], "colors": ["#dc2626", "#fb923c", "#1f2937"] }
-        };
-
+        const chartData = JSON.parse({{ (dashboard_data.chart_data if dashboard_data and dashboard_data.chart_data else '{}') | tojson | safe }});
         const plateRows = document.querySelectorAll('.plate-row');
         let activeChart = null;
 
@@ -250,13 +282,10 @@
 
         function updateChart(plateCode) {
             if (!chartData[plateCode]) return;
-
+            
             const data = chartData[plateCode];
-
-            if (activeChart) {
-                activeChart.destroy();
-            }
-
+            if (activeChart) activeChart.destroy();
+            
             activeChart = new Chart(plateChartCanvas, {
                 type: 'bar',
                 data: {
@@ -270,21 +299,24 @@
                     }]
                 },
                 options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value, index, values) {
-                                    return yAxisLabels[value] || '';
-                                }
-                            },
-                            min: 0,
-                            max: 5.5
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { 
+                        y: { 
+                            beginAtZero: true, 
+                            ticks: { 
+                                callback: (value) => yAxisLabels[value] || '',
+                                stepSize: 1
+                            }, 
+                            min: 0, 
+                            max: 5.5 
                         }
                     },
-                    plugins: {
-                        legend: {
-                            display: false
+                    plugins: { 
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: `Detalhes da Placa: ${plateCode}`
                         }
                     }
                 }
@@ -293,17 +325,12 @@
 
         plateRows.forEach(row => {
             row.addEventListener('click', function() {
-                // Remove o destaque de outras linhas
                 plateRows.forEach(r => r.classList.remove('bg-blue-100', 'border-blue-500'));
-                // Adiciona destaque à linha clicada
                 this.classList.add('bg-blue-100', 'border-blue-500');
-                
-                const plateCode = this.dataset.plateCode;
-                updateChart(plateCode);
+                updateChart(this.dataset.plateCode);
             });
         });
 
-        // Inicializa o gráfico com a primeira placa da lista, se houver
         if (plateRows.length > 0) {
             plateRows[0].click();
         }
