@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Container principal para centralizar todo o conteúdo e definir uma largura máxima -->
+<div class="container mx-auto max-w-7xl px-4">
+
+  <!-- Bloco de Título da Página -->
+  <div class="my-6">
+    <h1 class="text-3xl font-bold text-gray-800">{{ title or "Dashboard" }}</h1>
+    <p class="text-gray-500">{{ subtitle or "Visão geral do sistema" }}</p>
+  </div>
+
+  <!-- Layout de duas colunas para filtros e dashboard -->
+  <div class="flex flex-col lg:flex-row gap-6">
+
+    <!-- Coluna de Filtros (Esquerda) -->
+    <aside class="w-full lg:w-72 bg-white p-6 rounded-xl shadow-lg h-fit">
+      <h3 class="font-bold text-lg text-gray-800 mb-4 border-b border-gray-200 pb-2">Filtros</h3>
+      <form id="statusForm" method="GET" action="{{ url_for('status_page') }}" class="space-y-4">
+        
+        <!-- Dropdowns de filtro (Unidade, Processo, etc.) -->
+        <div>
+          <label for="unidade" class="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
+          <select id="unidade" name="unidade" class="w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            <option value="">Todas</option>
+            {% for unity in unities %}
+              <option value="{{ unity }}" {% if selected_values.unidade == unity %}selected{% endif %}>{{ unity }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="processo" class="block text-sm font-medium text-gray-700 mb-1">Processo</label>
+          <select id="processo" name="processo" class="w-full p-2 rounded-md" {% if not selected_values.unidade %}disabled{% endif %}>
+            <option value="">Todos</option>
+            {% for process in processes %}
+              <option value="{{ process }}" {% if selected_values.processo == process %}selected{% endif %}>{{ process }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="transportador" class="block text-sm font-medium text-gray-700 mb-1">Transportador</label>
+          <select id="transportador" name="transportador" class="w-full p-2 rounded-md" {% if not selected_values.processo %}disabled{% endif %}>
+            <option value="">Todos</option>
+            {% for transporter in transporters %}
+              <option value="{{ transporter }}" {% if selected_values.transportador == transporter %}selected{% endif %}>{{ transporter }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="tambor" class="block text-sm font-medium text-gray-700 mb-1">Tambor</label>
+          <select id="tambor" name="tambor" class="w-full p-2 rounded-md" {% if not selected_values.transportador %}disabled{% endif %}>
+            <option value="">Todos</option>
+            {% for barrel in barrels %}
+              <option value="{{ barrel }}" {% if selected_values.tambor == barrel %}selected{% endif %}>{{ barrel }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+      </form>
+    </aside>
+
+    <!-- Conteúdo Principal (Direita) -->
+    <main class="flex-1 space-y-6">
+        <!-- Exibe a mensagem de erro, se houver -->
+        {% if error %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl" role="alert">
+                <strong class="font-bold">Erro!</strong>
+                <span class="block sm:inline">{{ error }}</span>
+            </div>
+        {% endif %}
+      
+        <!-- Cards de Contagem Geral (Sempre visíveis) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center text-center">
+                <span class="text-5xl font-bold text-gray-800">{{ dashboard_data.process_count or 0 }}</span>
+                <span class="text-md text-gray-500 mt-2">Processos</span>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center text-center">
+                <span class="text-5xl font-bold text-gray-800">{{ dashboard_data.transporter_count or 0 }}</span>
+                <span class="text-md text-gray-500 mt-2">Transportadores</span>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center text-center">
+                <span class="text-5xl font-bold text-gray-800">{{ dashboard_data.barrel_count or 0 }}</span>
+                <span class="text-md text-gray-500 mt-2">Tambores</span>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center text-center">
+                <span class="text-5xl font-bold text-gray-800">{{ dashboard_data.plate_count or 0 }}</span>
+                <span class="text-md text-gray-500 mt-2">Placas</span>
+            </div>
+        </div>
+
+        <!-- Cards de Espessura (Sempre visíveis) -->
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+            <h3 class="font-bold text-center text-md uppercase text-gray-600 mb-4">Espessura dos Revestimentos dos Tambores</h3>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 text-white">
+                <div class="bg-green-600 p-4 rounded-lg flex flex-col items-center justify-center">
+                    <span class="text-4xl font-bold">{{ dashboard_data.thickness_counts.get(10, 0) if dashboard_data else 0 }}</span>
+                    <span class="text-sm font-light">&gt;10mm</span>
+                </div>
+                <div class="bg-yellow-500 p-4 rounded-lg flex flex-col items-center justify-center">
+                    <span class="text-4xl font-bold">{{ dashboard_data.thickness_counts.get(8, 0) if dashboard_data else 0 }}</span>
+                    <span class="text-sm font-light">&lt;10mm</span>
+                </div>
+                <div class="bg-orange-400 p-4 rounded-lg flex flex-col items-center justify-center">
+                    <span class="text-4xl font-bold">{{ dashboard_data.thickness_counts.get(5, 0) if dashboard_data else 0 }}</span>
+                    <span class="text-sm font-light">&lt;8mm</span>
+                </div>
+                <div class="bg-red-600 p-4 rounded-lg flex flex-col items-center justify-center">
+                    <span class="text-4xl font-bold">{{ dashboard_data.thickness_counts.get(0, 0) if dashboard_data else 0 }}</span>
+                    <span class="text-sm font-light">&lt;5mm</span>
+                </div>
+                <div class="bg-gray-800 p-4 rounded-lg flex flex-col items-center justify-center col-span-2 lg:col-span-1">
+                    <span class="text-4xl font-bold">{{ dashboard_data.thickness_counts.get(-1, 0) if dashboard_data else 0 }}</span>
+                    <span class="text-sm font-light">Erro de Leitura</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bloco do Google Maps -->
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+            <h3 class="font-bold text-center text-md uppercase text-gray-600 mb-4">Localização</h3>
+            <div id="map" class="w-full h-96 bg-gray-200 rounded-lg"></div>
+        </div>
+        
+        <!-- Detalhes do Tambor e Placas -->
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+            <h3 class="font-bold text-center text-md uppercase text-gray-600 mb-4">
+              {% if selected_values.tambor %}
+                Detalhes do Tambor: {{ selected_values.tambor }}
+              {% else %}
+                Detalhes dos Tambores
+              {% endif %}
+            </h3>
+            <div class="flex flex-col md:flex-row gap-6">
+                <!-- Coluna da Lista de Placas -->
+                <div class="w-full md:w-1/2">
+                    <div class="w-full mx-auto border-t-4 border-b-4 border-gray-500 rounded-xl border-l-8 border-r-8 p-2">
+                        <div class="grid grid-cols-4 gap-3 px-3 mb-2">
+                            <span class="font-bold">Placa</span>
+                            <span class="font-bold text-center">Seção 1</span>
+                            <span class="font-bold text-center">Seção 2</span>
+                            <span class="font-bold text-center">Seção 3</span>
+                        </div>
+                        <div id="plate-list" class="space-y-1">
+                            {% if dashboard_data and dashboard_data.plates_details %}
+                                <!-- Renderiza com dados reais da API -->
+                                {% for plate in dashboard_data.plates_details %}
+                                    {% set min_thickness = (plate.secoes.values() | list) | min %}
+                                    <div class="plate-row grid grid-cols-4 gap-3 px-3 border border-gray-400 p-2 rounded-lg cursor-pointer hover:bg-gray-100" data-plate-code="{{ plate.codigo or plate.placa }}">
+                                        <span class="self-center font-bold {{ plate_styles[min_thickness]['text'] }}">{{ plate.codigo or plate.placa }}</span>
+                                        {% for secao, espessura in plate.secoes.items() %}
+                                        <div class="flex justify-center items-center border-2 {{ plate_styles[espessura]['border'] }} p-1 rounded-lg text-center">
+                                            <span class="{{ plate_styles[espessura]['text'] }}">{{ plate_styles[espessura]['label'] }}</span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <!-- Renderiza com dados de EXEMPLO para avaliação do layout -->
+                                <div class="plate-row grid grid-cols-4 gap-3 px-3 border border-gray-400 p-2 rounded-lg cursor-pointer hover:bg-gray-100" data-plate-code="PLACA-01">
+                                    <span class="self-center font-bold text-green-600">PLACA-01</span>
+                                    <div class="flex justify-center items-center border-2 border-green-600 p-1 rounded-lg text-center"><span class="text-green-600">&gt;10mm</span></div>
+                                    <div class="flex justify-center items-center border-2 border-green-600 p-1 rounded-lg text-center"><span class="text-green-600">&gt;10mm</span></div>
+                                    <div class="flex justify-center items-center border-2 border-green-600 p-1 rounded-lg text-center"><span class="text-green-600">&gt;10mm</span></div>
+                                </div>
+                                <div class="plate-row grid grid-cols-4 gap-3 px-3 border border-gray-400 p-2 rounded-lg cursor-pointer hover:bg-gray-100" data-plate-code="PLACA-02">
+                                    <span class="self-center font-bold text-orange-400">PLACA-02</span>
+                                    <div class="flex justify-center items-center border-2 border-green-600 p-1 rounded-lg text-center"><span class="text-green-600">&gt;10mm</span></div>
+                                    <div class="flex justify-center items-center border-2 border-orange-400 p-1 rounded-lg text-center"><span class="text-orange-400">&lt;8mm</span></div>
+                                    <div class="flex justify-center items-center border-2 border-yellow-500 p-1 rounded-lg text-center"><span class="text-yellow-500">&lt;10mm</span></div>
+                                </div>
+                                <div class="plate-row grid grid-cols-4 gap-3 px-3 border border-gray-400 p-2 rounded-lg cursor-pointer hover:bg-gray-100" data-plate-code="PLACA-03">
+                                    <span class="self-center font-bold text-red-600">PLACA-03</span>
+                                    <div class="flex justify-center items-center border-2 border-red-600 p-1 rounded-lg text-center"><span class="text-red-600">&lt;5mm</span></div>
+                                    <div class="flex justify-center items-center border-2 border-orange-400 p-1 rounded-lg text-center"><span class="text-orange-400">&lt;8mm</span></div>
+                                    <div class="flex justify-center items-center border-2 border-gray-800 p-1 rounded-lg text-center"><span class="text-gray-800">Erro</span></div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <!-- Coluna do Gráfico -->
+                <div class="w-full md:w-1/2 flex items-center justify-center">
+                    <canvas id="plateChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        
+        
+    </main>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Script para submeter o formulário ao alterar os filtros
+  document.addEventListener('DOMContentLoaded', function() {
+    const selects = document.querySelectorAll('#statusForm select');
+    selects.forEach(select => {
+      select.addEventListener('change', function() {
+        this.form.submit();
+      });
+    });
+  });
+
+  // Script para inicializar o Google Maps
+  function initMap() {
+    const location = JSON.parse({{ location_data | safe }});
+    const defaultLocation = { lat: -18.9186, lng: -48.2772 };
+    const mapCenter = location || defaultLocation;
+
+    const map = new google.maps.Map(document.getElementById("map"), {
+      zoom: location ? 15 : 10,
+      center: mapCenter,
+      mapId: 'VULCAFLEX_MAP_ID'
+    });
+
+    if (location) {
+      new google.maps.Marker({
+        position: mapCenter,
+        map: map,
+        title: "Localização do Tambor",
+      });
+    }
+  }
+</script>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key }}&callback=initMap"></script>
+
+<!-- Script do Gráfico de Barras -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const plateChartCanvas = document.getElementById('plateChart');
+        if (!plateChartCanvas) return;
+
+        // Tenta obter dados reais. Se não existirem, usa dados de exemplo.
+        const hasRealData = {{ 'true' if (dashboard_data and dashboard_data.plates_details) else 'false' }};
+        const chartData = hasRealData ? JSON.parse({{ chart_data | safe }}) : {
+            "PLACA-01": { "labels": ["Seção 1", "Seção 2", "Seção 3"], "values": [5, 5, 5], "colors": ["#16a34a", "#16a34a", "#16a34a"] },
+            "PLACA-02": { "labels": ["Seção 1", "Seção 2", "Seção 3"], "values": [5, 3, 4], "colors": ["#16a34a", "#fb923c", "#eab308"] },
+            "PLACA-03": { "labels": ["Seção 1", "Seção 2", "Seção 3"], "values": [2, 3, 1], "colors": ["#dc2626", "#fb923c", "#1f2937"] }
+        };
+
+        const plateRows = document.querySelectorAll('.plate-row');
+        let activeChart = null;
+
+        const yAxisLabels = { 1: 'Erro', 2: '<5mm', 3: '<8mm', 4: '<10mm', 5: '>10mm' };
+
+        function updateChart(plateCode) {
+            if (!chartData[plateCode]) return;
+
+            const data = chartData[plateCode];
+
+            if (activeChart) {
+                activeChart.destroy();
+            }
+
+            activeChart = new Chart(plateChartCanvas, {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: `Espessura da Placa ${plateCode}`,
+                        data: data.values,
+                        backgroundColor: data.colors,
+                        borderColor: data.colors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value, index, values) {
+                                    return yAxisLabels[value] || '';
+                                }
+                            },
+                            min: 0,
+                            max: 5.5
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        plateRows.forEach(row => {
+            row.addEventListener('click', function() {
+                // Remove o destaque de outras linhas
+                plateRows.forEach(r => r.classList.remove('bg-blue-100', 'border-blue-500'));
+                // Adiciona destaque à linha clicada
+                this.classList.add('bg-blue-100', 'border-blue-500');
+                
+                const plateCode = this.dataset.plateCode;
+                updateChart(plateCode);
+            });
+        });
+
+        // Inicializa o gráfico com a primeira placa da lista, se houver
+        if (plateRows.length > 0) {
+            plateRows[0].click();
+        }
+    });
+</script>
+{% endblock %}

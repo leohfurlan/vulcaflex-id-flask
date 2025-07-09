@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title or 'Vulcaflex Admin' }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
+</head>
+<body class="bg-slate-100">
+    
+    <!-- O header agora é o componente de topo da página -->
+    {% include 'partials/_header.html' %}
+
+    <!-- O conteúdo principal da página, como o seu dashboard, será inserido aqui -->
+    <div class="p-4 lg:p-6">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Bloco para scripts específicos da página -->
+    {% block scripts %}{% endblock %}
+</body>
+</html>
