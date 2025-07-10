@@ -6,7 +6,6 @@ from collections import defaultdict
 from dotenv import load_dotenv
 from datetime import datetime
 
-# Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
 
 app = Flask(__name__)
@@ -21,10 +20,8 @@ ADMIN_PASS = "5959"
 # --- Funções Auxiliares ---
 
 def flatten_if_nested(data_list):
-    if not data_list or not isinstance(data_list, list):
-        return []
-    if data_list and isinstance(data_list[0], list):
-        return [item[0] for item in data_list if item]
+    if not data_list or not isinstance(data_list, list): return []
+    if data_list and isinstance(data_list[0], list): return [item[0] for item in data_list if item]
     return data_list
 
 def get_plate_styles():
@@ -38,12 +35,10 @@ def get_plate_styles():
 
 def prepare_chart_data(plates_details, styles):
     chart_data = {}
-    if not plates_details:
-        return chart_data
+    if not plates_details: return chart_data
     for plate in plates_details:
         plate_code = plate.get('codigo') or plate.get('placa')
-        if not plate_code:
-            continue
+        if not plate_code: continue
         tick_map = {10: 5, 8: 4, 5: 3, 0: 2, -1: 1}
         chart_data[plate_code] = {
             'labels': list(plate.get('secoes', {}).keys()),
@@ -72,8 +67,16 @@ def get_summary_for_scope(selected_unity=None, selected_process=None, selected_t
                         info_res = requests.get(f"{API_BASE_URL}/tambor_info", params=params, timeout=10)
                         if info_res.ok:
                             info_data = info_res.json()
-                            if info_data.get('latitude') and info_data.get('longitude'):
-                                summary['locations'].append({'lat': info_data['latitude'], 'lng': info_data['longitude'], 'title': barrel_id})
+                            lat, lng = info_data.get('latitude'), info_data.get('longitude')
+                            if lat and lng:
+                                # AJUSTE: A estrutura de 'locations' já contém todos os dados necessários
+                                # para criar os links de filtro no mapa. Cada item da lista tem as
+                                # informações de unidade, processo, transportador e tambor.
+                                summary['locations'].append({
+                                    'lat': float(lat), 'lng': float(lng), 'title': barrel_id,
+                                    'unidade': unity, 'processo': process, 
+                                    'transportador': transporter, 'tambor': barrel_id
+                                })
                         agora_res = requests.get(f"{API_BASE_URL}/tambor_agora", params=params, timeout=10)
                         if agora_res.ok:
                             plates = agora_res.json().get('espessuraAtual', [])
@@ -87,10 +90,9 @@ def get_summary_for_scope(selected_unity=None, selected_process=None, selected_t
     return summary
 
 # --- Rotas da Aplicação ---
-
+    
 @app.route('/')
 def home():
-    """Redireciona para a página principal do dashboard."""
     return redirect(url_for('status_page'))
 
 @app.route('/status')
@@ -135,7 +137,7 @@ def status_page():
             
             context['dashboard_data'] = {
                 'info': tambor_info_data, 'plates_details': plates_details, 'thickness_counts': dict(thickness_counts),
-                'location_data': json.dumps([{'lat': tambor_info_data.get('latitude'), 'lng': tambor_info_data.get('longitude'), 'title': selected_barrel}]),
+                'location_data': json.dumps([{'lat': float(tambor_info_data.get('latitude', 0)), 'lng': float(tambor_info_data.get('longitude', 0)), 'title': selected_barrel}]),
                 'chart_data': json.dumps(prepare_chart_data(plates_details, context['plate_styles'])),
                 'general_stats': {
                     'unity_count': len(context['unities']), 'process_count': len(context['processes']),
@@ -182,30 +184,19 @@ def relatorio_tambor(unidade, processo, transportador, barrel_id):
         response = requests.get(f"{API_BASE_URL}/tambor_info", params=params, timeout=5)
         response.raise_for_status()
         drum_data = response.json()
-        
         if 'dataInstalacao' in drum_data:
             try:
                 date_obj = datetime.strptime(drum_data['dataInstalacao'], '%a, %d %b %Y %H:%M:%S %Z')
                 drum_data['dataInstalacaoFormatada'] = date_obj.strftime('%d/%m/%Y')
             except (ValueError, TypeError):
                 drum_data['dataInstalacaoFormatada'] = drum_data['dataInstalacao']
-
     except requests.exceptions.RequestException as e:
         error_message = f"Erro ao buscar dados do tambor: {e}"
         
     return render_template(
-        'relatorio.html',
-        title=f"Relatório do Tambor {barrel_id}",
-        drum_data=drum_data,
-        error=error_message,
-        maps_api_key=GOOGLE_MAPS_API_KEY,
-        # CORREÇÃO: Passando a data e hora atuais para o template
-        now=datetime.now(),
-        # Passando os parâmetros para o botão "Voltar"
-        unidade=unidade,
-        processo=processo,
-        transportador=transportador,
-        barrel_id=barrel_id
+        'relatorio.html', title=f"Relatório do Tambor {barrel_id}", drum_data=drum_data,
+        error=error_message, maps_api_key=GOOGLE_MAPS_API_KEY, now=datetime.now(),
+        unidade=unidade, processo=processo, transportador=transportador, barrel_id=barrel_id
     )
 
 if __name__ == '__main__':
