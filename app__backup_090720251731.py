@@ -4,7 +4,6 @@ import json
 from flask import Flask, render_template, request, redirect, url_for, flash
 from collections import defaultdict
 from dotenv import load_dotenv
-from datetime import datetime
 
 # Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
@@ -53,20 +52,41 @@ def prepare_chart_data(plates_details, styles):
     return chart_data
 
 def get_summary_for_scope(selected_unity=None, selected_process=None, selected_transporter=None):
-    summary = {'general_stats': defaultdict(int), 'thickness_counts': defaultdict(int), 'locations': []}
+    """
+    Busca e agrega dados para o escopo definido pelos filtros.
+    Se nenhum filtro for passado, busca o resumo geral.
+    """
+    summary = {
+        'general_stats': defaultdict(int),
+        'thickness_counts': defaultdict(int),
+        'locations': []
+    }
+    
     try:
+        # 1. Determina a lista de unidades para iterar
         unities_to_scan = [selected_unity] if selected_unity else flatten_if_nested(requests.get(f"{API_BASE_URL}/cliente_info", timeout=10).json().get('unidades', []))
         summary['general_stats']['unity_count'] = len(unities_to_scan)
+
         for unity in unities_to_scan:
+            # 2. Determina a lista de processos
             processes_to_scan = [selected_process] if selected_process else flatten_if_nested(requests.get(f"{API_BASE_URL}/cliente_info", params={'unidade': unity}, timeout=10).json().get('processos', []))
-            if not selected_unity: summary['general_stats']['process_count'] += len(processes_to_scan)
+            if not selected_unity: # Só soma se estivermos na visão geral
+                summary['general_stats']['process_count'] += len(processes_to_scan)
+
             for process in processes_to_scan:
+                # 3. Determina a lista de transportadores
                 transporters_to_scan = [selected_transporter] if selected_transporter else flatten_if_nested(requests.get(f"{API_BASE_URL}/cliente_info", params={'unidade': unity, 'processo': process}, timeout=10).json().get('transportadores', []))
-                if not selected_process: summary['general_stats']['transporter_count'] += len(transporters_to_scan)
+                if not selected_process: # Só soma se não houver um processo específico
+                     summary['general_stats']['transporter_count'] += len(transporters_to_scan)
+
                 for transporter in transporters_to_scan:
+                    # 4. Obter tambores
                     barrel_res = requests.get(f"{API_BASE_URL}/cliente_info", params={'unidade': unity, 'processo': process, 'transportador': transporter}, timeout=10)
                     barrels = flatten_if_nested(barrel_res.json().get('IDs', []))
-                    if not selected_transporter: summary['general_stats']['barrel_count'] += len(barrels)
+                    if not selected_transporter: # Só soma se não houver um transportador específico
+                        summary['general_stats']['barrel_count'] += len(barrels)
+
+                    # 5. Obter detalhes de cada tambor para agregar localização e espessura
                     for barrel_id in barrels:
                         params = {'unidade': unity, 'processo': process, 'transportador': transporter, 'ID': barrel_id}
                         info_res = requests.get(f"{API_BASE_URL}/tambor_info", params=params, timeout=10)
@@ -74,16 +94,23 @@ def get_summary_for_scope(selected_unity=None, selected_process=None, selected_t
                             info_data = info_res.json()
                             if info_data.get('latitude') and info_data.get('longitude'):
                                 summary['locations'].append({'lat': info_data['latitude'], 'lng': info_data['longitude'], 'title': barrel_id})
+                        
                         agora_res = requests.get(f"{API_BASE_URL}/tambor_agora", params=params, timeout=10)
                         if agora_res.ok:
                             plates = agora_res.json().get('espessuraAtual', [])
                             for plate in plates:
                                 section_values = [v for v in plate.get('secoes', {}).values() if isinstance(v, (int, float))]
-                                if section_values: summary['thickness_counts'][min(section_values)] += 1
+                                if section_values:
+                                    summary['thickness_counts'][min(section_values)] += 1
+        
+        # Se um escopo foi selecionado, as contagens são o tamanho das listas populadas
         if selected_process: summary['general_stats']['process_count'] = 1
         if selected_transporter: summary['general_stats']['transporter_count'] = 1
+
     except requests.exceptions.RequestException as e:
         print(f"ERRO durante a busca do resumo: {e}")
+        # Retorna o que foi possível coletar
+    
     return summary
 
 # --- Rotas da Aplicação ---
@@ -108,6 +135,7 @@ def status_page():
     }
 
     try:
+        # 1. Carregar dados para os dropdowns
         unities_response = requests.get(f"{API_BASE_URL}/cliente_info", timeout=5)
         context['unities'] = flatten_if_nested(unities_response.json().get('unidades', []))
         if selected_unity:
@@ -120,7 +148,9 @@ def status_page():
             barrel_response = requests.get(f"{API_BASE_URL}/cliente_info", params={'unidade': selected_unity, 'processo': selected_process, 'transportador': selected_transporter}, timeout=5)
             context['barrels'] = flatten_if_nested(barrel_response.json().get('IDs', []))
 
+        # 2. Carregar dados para o Dashboard
         if selected_barrel:
+            # Visão detalhada de um tambor específico
             params = {'unidade': selected_unity, 'processo': selected_process, 'transportador': selected_transporter, 'ID': selected_barrel}
             info_response = requests.get(f"{API_BASE_URL}/tambor_info", params=params, timeout=5)
             info_response.raise_for_status()
@@ -128,10 +158,12 @@ def status_page():
             agora_response = requests.get(f"{API_BASE_URL}/tambor_agora", params=params, timeout=5)
             agora_response.raise_for_status()
             plates_details = agora_response.json().get('espessuraAtual', [])
+            
             thickness_counts = defaultdict(int)
             for plate in plates_details:
                 section_values = [v for v in plate.get('secoes', {}).values() if isinstance(v, (int, float))]
-                if section_values: thickness_counts[min(section_values)] += 1
+                if section_values:
+                    thickness_counts[min(section_values)] += 1
             
             context['dashboard_data'] = {
                 'info': tambor_info_data, 'plates_details': plates_details, 'thickness_counts': dict(thickness_counts),
@@ -143,11 +175,15 @@ def status_page():
                 }
             }
         else:
+            # Visão de resumo (geral ou por filtro parcial)
             summary = get_summary_for_scope(selected_unity, selected_process, selected_transporter)
             context['dashboard_data'] = {
-                'general_stats': summary['general_stats'], 'thickness_counts': summary['thickness_counts'],
-                'location_data': json.dumps(summary['locations']), 'plates_details': None, 'chart_data': '{}'
+                'general_stats': summary['general_stats'],
+                'thickness_counts': summary['thickness_counts'],
+                'location_data': json.dumps(summary['locations']),
+                'plates_details': None, 'chart_data': '{}'
             }
+
     except requests.exceptions.RequestException as e:
         context['error'] = f"Erro ao comunicar com a API: {e}"
     except Exception as e:
@@ -171,42 +207,6 @@ def remove_barrel():
     except requests.exceptions.RequestException as e:
         flash(f"Erro ao remover o tambor: {e}", "error")
     return redirect(url_for('status_page', unidade=unidade, processo=processo, transportador=transportador))
-
-@app.route('/relatorio/<unidade>/<processo>/<transportador>/<barrel_id>')
-def relatorio_tambor(unidade, processo, transportador, barrel_id):
-    drum_data = None
-    error_message = None
-    params = {'unidade': unidade, 'processo': processo, 'transportador': transportador, 'ID': barrel_id}
-    
-    try:
-        response = requests.get(f"{API_BASE_URL}/tambor_info", params=params, timeout=5)
-        response.raise_for_status()
-        drum_data = response.json()
-        
-        if 'dataInstalacao' in drum_data:
-            try:
-                date_obj = datetime.strptime(drum_data['dataInstalacao'], '%a, %d %b %Y %H:%M:%S %Z')
-                drum_data['dataInstalacaoFormatada'] = date_obj.strftime('%d/%m/%Y')
-            except (ValueError, TypeError):
-                drum_data['dataInstalacaoFormatada'] = drum_data['dataInstalacao']
-
-    except requests.exceptions.RequestException as e:
-        error_message = f"Erro ao buscar dados do tambor: {e}"
-        
-    return render_template(
-        'relatorio.html',
-        title=f"Relatório do Tambor {barrel_id}",
-        drum_data=drum_data,
-        error=error_message,
-        maps_api_key=GOOGLE_MAPS_API_KEY,
-        # CORREÇÃO: Passando a data e hora atuais para o template
-        now=datetime.now(),
-        # Passando os parâmetros para o botão "Voltar"
-        unidade=unidade,
-        processo=processo,
-        transportador=transportador,
-        barrel_id=barrel_id
-    )
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

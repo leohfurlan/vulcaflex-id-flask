@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-8">
+    
+    <!-- Cabeçalho com Título e Botões de Ação -->
+    <div class="flex justify-between items-center mb-8 print:hidden">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">{{ title }}</h1>
+            {% if now %}
+            <p class="text-gray-500">Gerado em: {{ now.strftime('%d/%m/%Y %H:%M:%S') }}</p>
+            {% endif %}
+        </div>
+        <div class="flex gap-4">
+            <a href="{{ url_for('status_page', unidade=unidade, processo=processo, transportador=transportador, tambor=barrel_id) }}" class="text-white font-bold py-2 px-4 rounded-lg" style="display: block; text-align: center; background-color: rgb(37, 99, 235); color: white; padding: 0.5rem 1rem; border-radius: 0.5rem;">
+                Voltar
+            </a>
+        
+            <button onclick="window.print()" class="text-white font-bold py-2 px-4 rounded-lg" style="display: block; text-align: center; background-color: rgb(37, 99, 235); color: white; padding: 0.5rem 1rem; border-radius: 0.5rem;">
+                Imprimir / Salvar PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- Mensagem de Erro -->
+    {% if error %}
+    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl" role="alert">
+        <strong class="font-bold">Erro!</strong>
+        <span class="block sm:inline">{{ error }}</span>
+    </div>
+    {% elif drum_data %}
+    <!-- Corpo do Relatório -->
+    <div class="bg-white p-8 rounded-xl shadow-lg border">
+        
+        <header class="text-center border-b-2 pb-4 mb-8">
+            <!-- CORREÇÃO: Adicionadas classes para controlar o tamanho da logo -->
+            <img src="{{ url_for('static', filename='images/logo_vulcaflex_fundo_branco.png') }}" alt="Logo Vulcaflex" class="mx-auto max-w-xs mb-4" width="200" height="150">
+            <h2 class="text-2xl font-bold text-gray-800">Relatório de Status do Tambor</h2>
+        </header>
+
+        <main class="space-y-8 p-6 py-6">
+            <!-- Seção de Dados Gerais -->
+            <section class="py-6">
+                <h3 class="text-xl font-semibold text-gray-700 border-b pb-2 mb-4">Informações Gerais</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-gray-600">
+                    <p><strong>ID do Tambor:</strong> {{ drum_data.get('ID', 'N/A') }}</p>
+                    <p><strong>Responsável:</strong> {{ drum_data.get('responsavel', 'N/A') }}</p>
+                    <p><strong>Data de Instalação:</strong> {{ drum_data.get('dataInstalacaoFormatada', 'N/A') }}</p>
+                    <p><strong>Horas Trabalhadas:</strong> {{ drum_data.get('horasTrabalhadas', 0) | round(2) }}</p>
+                </div>
+            </section>
+
+            <!-- Seção de Placas -->
+            <section class="py-6">
+                <h3 class="text-xl text-gray-700 border-b pb-2 mb-4">Placas Instaladas</h3>
+                {% if drum_data.get('placas') %}
+                    {% set placas = drum_data.placas.split(',') %}
+                    <ul class="list-disc list-inside grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {% for placa in placas %}
+                        <li class="text-lg font-semibold text-gray-600">
+                            <strong>{{ placa.strip() }}</strong>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class=" text-xl  text-gray-500">Nenhuma placa registrada para este tambor.</p>
+                {% endif %}
+            </section>
+
+            <!-- Seção de Localização -->
+            <section class="py-6">
+                <h3 class="text-xl font-semibold text-gray-700 border-b pb-2 mb-4">Localização Geográfica</h3>
+                <p class="text-gray-600 mb-4">
+                    <strong>Latitude:</strong> {{ drum_data.get('latitude', 'N/A') }} | <strong>Longitude:</strong> {{ drum_data.get('longitude', 'N/A') }}
+                </p>
+                <div id="map" class="w-full h-80 bg-gray-200 rounded-lg border"></div>
+            </section>
+        </main>
+        
+        <footer class="text-center text-xs text-gray-400 pt-8 mt-8 border-t">
+            Relatório gerado pelo Sistema de Monitoramento Gripflex ID.
+        </footer>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Scripts para o mapa e impressão -->
+{% if maps_api_key and drum_data and drum_data.latitude and drum_data.longitude %}
+<script async defer src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key }}&callback=initMap"></script>
+<script>
+  function initMap() {
+    const location = { lat: {{ drum_data.latitude }}, lng: {{ drum_data.longitude }} };
+    const mapDiv = document.getElementById("map");
+    
+    const map = new google.maps.Map(mapDiv, {
+        zoom: 15,
+        center: location,
+        disableDefaultUI: true, // Remove controles para um visual mais limpo no relatório
+    });
+
+    new google.maps.Marker({
+        position: location,
+        map: map,
+        title: "Localização do Tambor {{ drum_data.ID }}",
+    });
+  }
+</script>
+{% else %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const mapDiv = document.getElementById("map");
+        if (mapDiv) {
+            mapDiv.innerHTML = '<div class="h-full flex items-center justify-center"><p class="text-center text-gray-500">A chave da API do Google Maps não foi configurada ou os dados de localização não estão disponíveis.</p></div>';
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}
