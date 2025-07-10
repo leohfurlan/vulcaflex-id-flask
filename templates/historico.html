@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto max-w-7xl px-4">
+
+  <div class="flex justify-between items-center my-6">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-800">{{ title or "Histórico" }}</h1>
+      <p class="text-gray-500">{{ subtitle or "Acompanhe a evolução do desgaste" }}</p>
+    </div>
+    <div>
+      <a href="{{ url_for('status_page', unidade=selected_values.unidade, processo=selected_values.processo, transportador=selected_values.transportador, tambor=selected_values.tambor) }}"
+         class="text-white font-bold py-2 px-4 rounded-lg" style="display: block; text-align: center; background-color: rgb(37, 99, 235); color: white; padding: 0.5rem 1rem; border-radius: 0.5rem;">
+        Voltar
+      </a>
+    </div>
+  </div>
+
+  <div class="flex flex-col lg:flex-row gap-6">
+
+    <aside class="w-full lg:w-72 bg-white p-6 rounded-xl shadow-lg h-fit flex-shrink-0">
+      <h3 class="font-bold text-lg text-gray-800 mb-4 border-b border-gray-200 pb-2">Filtros</h3>
+      <form id="filterForm" method="GET" action="{{ url_for('historico_page') }}" class="space-y-4">
+        
+        <div>
+          <label for="unidade" class="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
+          <select id="unidade" name="unidade" class="w-full p-2 rounded-md border-gray-300 shadow-sm" onchange="this.form.submit()">
+            <option value="">Selecione</option>
+            {% for u in unities %}<option value="{{ u }}" {% if selected_values.unidade == u %}selected{% endif %}>{{ u }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="processo" class="block text-sm font-medium text-gray-700 mb-1">Processo</label>
+          <select id="processo" name="processo" class="w-full p-2 rounded-md" {% if not selected_values.unidade %}disabled{% endif %} onchange="this.form.submit()">
+            <option value="">Selecione</option>
+            {% for p in processes %}<option value="{{ p }}" {% if selected_values.processo == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+            <label for="transportador" class="block text-sm font-medium text-gray-700 mb-1">Transportador</label>
+            <select id="transportador" name="transportador" class="w-full p-2 rounded-md" {% if not selected_values.processo %}disabled{% endif %} onchange="this.form.submit()">
+                <option value="">Selecione</option>
+                {% for t in transporters %}<option value="{{ t }}" {% if selected_values.transportador == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="tambor" class="block text-sm font-medium text-gray-700 mb-1">Tambor</label>
+            <select id="tambor" name="tambor" class="w-full p-2 rounded-md" {% if not selected_values.transportador %}disabled{% endif %} onchange="this.form.submit()">
+                <option value="">Selecione</option>
+                {% for b in barrels %}<option value="{{ b }}" {% if selected_values.tambor == b %}selected{% endif %}>{{ b }}</option>{% endfor %}
+            </select>
+        </div>
+
+        {% if selected_values.tambor %}
+        <div>
+            <label for="placa" class="block text-sm font-medium text-gray-700 mb-1">Placa</label>
+            <select id="placa" name="placa" class="w-full p-2 rounded-md">
+                <option value="">Selecione</option>
+                {% for p in plates %}<option value="{{ p }}" {% if selected_values.placa == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="dataInicio" class="block text-sm font-medium text-gray-700 mb-1">Data Início</label>
+            <input type="date" id="dataInicio" name="dataInicio" value="{{ selected_values.dataInicio or '' }}" class="w-full p-2 rounded-md border border-gray-300 shadow-sm" required>
+        </div>
+        <div>
+            <label for="dataFim" class="block text-sm font-medium text-gray-700 mb-1">Data Fim</label>
+            <input type="date" id="dataFim" name="dataFim" value="{{ selected_values.dataFim or '' }}" class="w-full p-2 rounded-md border border-gray-300 shadow-sm" required>
+        </div>
+        
+        <div id="date-error" class="text-red-600 text-sm mt-2 font-semibold" style="display: none;">A data final deve ser maior ou igual à data inicial.</div>
+        
+        <button type="submit" class="w-full bg-orange-400 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out">
+            Gerar Histórico
+        </button>
+        {% endif %}
+
+      </form>
+    </aside>
+
+    <main class="flex-1 space-y-6">
+        {% if error %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl" role="alert">
+                <strong class="font-bold">Erro!</strong>
+                <span class="block sm:inline">{{ error }}</span>
+            </div>
+        {% endif %}
+      
+        {% if chart_data and chart_data|length > 2 %}
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+            <h3 class="font-bold text-center text-md uppercase text-gray-600 mb-4">
+                Histórico de Desgaste do Tambor: {{ selected_values.tambor }} | Placa: {{ selected_values.placa }}
+            </h3>
+            <div class="w-full h-96">
+                <canvas id="historyChart"></canvas>
+            </div>
+        </div>
+        {% elif selected_values.dataInicio %}
+        <div class="bg-white p-6 rounded-xl shadow-lg text-center text-gray-500">
+            <p>Nenhum dado de histórico encontrado para o período e placa selecionados.</p>
+        </div>
+        {% else %}
+        <div class="bg-white p-6 rounded-xl shadow-lg text-center text-gray-500">
+            <p>Por favor, selecione os filtros e um período para gerar o histórico.</p>
+        </div>
+        {% endif %}
+    </main>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById('filterForm');
+    const dateErrorDiv = document.getElementById('date-error');
+
+    // Adiciona validação de data antes de submeter o formulário
+    if(form) {
+        form.addEventListener('submit', function(event) {
+            const startDateInput = document.getElementById('dataInicio');
+            const endDateInput = document.getElementById('dataFim');
+            
+            // Verifica se os campos de data existem antes de validar
+            if (startDateInput && endDateInput) {
+                const startDate = startDateInput.value;
+                const endDate = endDateInput.value;
+
+                if (startDate && endDate && startDate > endDate) {
+                    event.preventDefault(); // Impede a submissão do formulário
+                    dateErrorDiv.style.display = 'block'; // Mostra a mensagem de erro
+                } else {
+                    dateErrorDiv.style.display = 'none'; // Esconde a mensagem de erro
+                }
+            }
+        });
+    }
+
+    const ctx = document.getElementById('historyChart');
+    if (ctx) {
+        try {
+            const chartData = JSON.parse({{ chart_data | tojson | safe }});
+            const yAxisLabels = { 1: 'Erro', 2: '<5mm', 3: '<8mm', 4: '<10mm', 5: '>10mm' };
+
+            if (chartData && chartData.labels && chartData.labels.length > 0) {
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: chartData.labels,
+                        datasets: chartData.datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom' },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) { label += ': '; }
+                                        if (context.parsed.y !== null) {
+                                            label += yAxisLabels[context.parsed.y] || context.parsed.y;
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                min: 0.5, max: 5.5,
+                                ticks: {
+                                    stepSize: 1,
+                                    callback: (value) => yAxisLabels[value] || ''
+                                },
+                                title: { display: true, text: 'Espessura (mm)' }
+                            },
+                            x: { title: { display: true, text: 'Data da Medição' } }
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.error("Erro ao renderizar o gráfico:", e);
+        }
+    }
+});
+</script>
+{% endblock %}

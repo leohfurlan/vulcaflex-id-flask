@@ -777,6 +777,10 @@ body {
   align-items: center;
 }
 
+.items-right {
+  align-items: right;
+}
+
 .justify-end {
   justify-content: flex-end;
 }

@@ -163,9 +163,25 @@
         <!-- Detalhes do Tambor e Placas (Apenas se um tambor for selecionado) -->
         {% if selected_values.tambor and dashboard_data and dashboard_data.plates_details %}
         <div class="bg-white p-6 rounded-xl shadow-lg">
-            <h3 class="font-bold text-center text-md uppercase text-gray-600 mb-4">
-                Detalhes do Tambor: {{ selected_values.tambor }}
-            </h3>
+            
+            <!-- Cabeçalho flex: título centralizado, botão no topo direito -->
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-md uppercase text-gray-600 text-center w-full">
+                    Detalhes do Tambor: {{ selected_values.tambor }}
+                </h3>
+
+            <div class="flex items-right mb-4">
+                <a href="{{ url_for('historico_page',
+                                    unidade=selected_values.unidade,
+                                    processo=selected_values.processo,
+                                    transportador=selected_values.transportador,
+                                    tambor=selected_values.tambor) }}"
+                class="w-full bg-orange-400 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out"
+                style="min-width:170px; text-align:center;">
+                    Ver Histórico
+                </a>
+            </div>
+            </div>
             <div class="flex flex-col md:flex-row gap-6">
                 <!-- Coluna da Lista de Placas -->
                 <div class="w-full md:w-1/2">
@@ -199,6 +215,7 @@
             </div>
         </div>
         {% endif %}
+
         
     </main>
   </div>
