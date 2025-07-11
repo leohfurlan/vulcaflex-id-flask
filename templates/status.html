@@ -72,16 +72,7 @@
         >
           Gerar Relatório
         </a>
-        <!-- Botão para Remover Tambor -->
-        <form action="{{ url_for('remove_barrel') }}" method="POST" class="w-full" onsubmit="return confirm('Tem certeza que deseja remover este tambor? Esta ação não pode ser desfeita.');">
-            <input type="hidden" name="unidade" value="{{ selected_values.unidade }}">
-            <input type="hidden" name="processo" value="{{ selected_values.processo }}">
-            <input type="hidden" name="transportador" value="{{ selected_values.transportador }}">
-            <input type="hidden" name="tambor" value="{{ selected_values.tambor }}">
-            <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out">
-                Remover Tambor
-            </button>
-        </form>
+        
       </div>
       {% endif %}
     </aside>

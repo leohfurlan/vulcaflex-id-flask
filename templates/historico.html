@@ -111,28 +111,41 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const form = document.getElementById('filterForm');
     const dateErrorDiv = document.getElementById('date-error');
+    let historyChartInstance = null; // Guarda a instância do gráfico
 
-    // Adiciona validação de data antes de submeter o formulário
+    // Validação de data
     if(form) {
         form.addEventListener('submit', function(event) {
             const startDateInput = document.getElementById('dataInicio');
             const endDateInput = document.getElementById('dataFim');
             
-            // Verifica se os campos de data existem antes de validar
             if (startDateInput && endDateInput) {
                 const startDate = startDateInput.value;
                 const endDate = endDateInput.value;
 
                 if (startDate && endDate && startDate > endDate) {
-                    event.preventDefault(); // Impede a submissão do formulário
-                    dateErrorDiv.style.display = 'block'; // Mostra a mensagem de erro
+                    event.preventDefault();
+                    dateErrorDiv.style.display = 'block';
                 } else {
-                    dateErrorDiv.style.display = 'none'; // Esconde a mensagem de erro
+                    dateErrorDiv.style.display = 'none';
                 }
+            }
+        });
+    }
+
+    // Botão de Resetar Zoom
+    const resetZoomBtn = document.getElementById('resetZoomBtn');
+    if (resetZoomBtn) {
+        resetZoomBtn.addEventListener('click', () => {
+            if (historyChartInstance) {
+                historyChartInstance.resetZoom();
             }
         });
     }
@@ -144,7 +157,13 @@ document.addEventListener("DOMContentLoaded", function () {
             const yAxisLabels = { 1: 'Erro', 2: '<5mm', 3: '<8mm', 4: '<10mm', 5: '>10mm' };
 
             if (chartData && chartData.labels && chartData.labels.length > 0) {
-                new Chart(ctx, {
+                // Destrói o gráfico anterior se ele existir
+                if (window.myHistoryChart) {
+                    window.myHistoryChart.destroy();
+                }
+
+                // Cria a nova instância do gráfico
+                historyChartInstance = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: chartData.labels,
@@ -166,6 +185,22 @@ document.addEventListener("DOMContentLoaded", function () {
                                         return label;
                                     }
                                 }
+                            },
+                            // --- CONFIGURAÇÃO DO ZOOM E PAN ---
+                            zoom: {
+                                pan: {
+                                    enabled: true, // Habilita o PAN (arrastar)
+                                    mode: 'x',     // Permite arrastar apenas no eixo X (tempo)
+                                },
+                                zoom: {
+                                    wheel: {
+                                        enabled: true, // Habilita o zoom com a roda do mouse
+                                    },
+                                    pinch: {
+                                        enabled: true // Habilita o zoom com gesto de pinça (mobile)
+                                    },
+                                    mode: 'x', // Permite zoom apenas no eixo X
+                                }
                             }
                         },
                         scales: {
@@ -177,10 +212,14 @@ document.addEventListener("DOMContentLoaded", function () {
                                 },
                                 title: { display: true, text: 'Espessura (mm)' }
                             },
-                            x: { title: { display: true, text: 'Data da Medição' } }
+                            x: { 
+                                title: { display: true, text: 'Data da Medição' }
+                            }
                         }
                     }
                 });
+                // Armazena a instância globalmente para poder resetar
+                window.myHistoryChart = historyChartInstance;
             }
         } catch (e) {
             console.error("Erro ao renderizar o gráfico:", e);

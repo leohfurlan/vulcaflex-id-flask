@@ -11,14 +11,27 @@
             <p class="text-gray-500">Gerado em: {{ now.strftime('%d/%m/%Y %H:%M:%S') }}</p>
             {% endif %}
         </div>
-        <div class="flex gap-4">
+        <div class="flex items-center gap-4">
+            <!-- Botão Voltar -->
             <a href="{{ url_for('status_page', unidade=unidade, processo=processo, transportador=transportador, tambor=barrel_id) }}" class="text-white font-bold py-2 px-4 rounded-lg" style="display: block; text-align: center; background-color: rgb(37, 99, 235); color: white; padding: 0.5rem 1rem; border-radius: 0.5rem;">
                 Voltar
             </a>
         
-            <button onclick="window.print()" class="text-white font-bold py-2 px-4 rounded-lg" style="display: block; text-align: center; background-color: rgb(37, 99, 235); color: white; padding: 0.5rem 1rem; border-radius: 0.5rem;">
+            <!-- Botão Imprimir -->
+            <button onclick="window.print()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300" style="height: 40px;">
                 Imprimir / Salvar PDF
             </button>
+            
+            <!-- Botão Remover Tambor (Formulário Corrigido) -->
+            <form action="{{ url_for('remove_barrel') }}" method="POST" onsubmit="return confirm('Tem certeza que deseja remover este tambor? Esta ação não pode ser desfeita.');">
+                <input type="hidden" name="unidade" value="{{ unidade }}">
+                <input type="hidden" name="processo" value="{{ processo }}">
+                <input type="hidden" name="transportador" value="{{ transportador }}">
+                <input type="hidden" name="tambor" value="{{ barrel_id }}">
+                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out" style="height: 40px;">
+                    Remover Tambor
+                </button>
+            </form>
         </div>
     </div>
 
