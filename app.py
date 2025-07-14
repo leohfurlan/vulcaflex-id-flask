@@ -91,19 +91,48 @@ def prepare_chart_data(plates_details, styles):
 
 def get_summary_for_scope(selected_unity=None, selected_process=None, selected_transporter=None):
     summary = {'general_stats': defaultdict(int), 'thickness_counts': defaultdict(int), 'locations': []}
+    
     try:
-        unities_to_scan = [selected_unity] if selected_unity else flatten_if_nested(requests.get(f"{API_BASE_URL}/cliente_info", timeout=10).json().get('unidades', []))
+        # ==================================================================
+        # INÍCIO DA LÓGICA DE CORREÇÃO
+        # ==================================================================
+
+        # 1. Busca TODAS as unidades válidas da API primeiro.
+        all_unities_res = requests.get(f"{API_BASE_URL}/cliente_info", timeout=10)
+        all_unities_res.raise_for_status()
+        valid_unities = flatten_if_nested(all_unities_res.json().get('unidades', []))
+
+        unities_to_scan = []
+        # 2. Determina quais unidades realmente processar.
+        if selected_unity:
+            # Se uma unidade foi selecionada, só a processe se ela for válida.
+            if selected_unity in valid_unities:
+                unities_to_scan = [selected_unity]
+        else:
+            # Se nenhuma foi selecionada, processa todas as unidades válidas.
+            unities_to_scan = valid_unities
+        
+        # 3. A contagem de unidades AGORA reflete a realidade.
         summary['general_stats']['unity_count'] = len(unities_to_scan)
+
+        # ==================================================================
+        # FIM DA LÓGICA DE CORREÇÃO
+        # ==================================================================
+
+        # O resto da função agora opera sobre a lista 'unities_to_scan', que é garantidamente válida.
         for unity in unities_to_scan:
             processes_to_scan = [selected_process] if selected_process else flatten_if_nested(requests.get(f"{API_BASE_URL}/cliente_info", params={'unidade': unity}, timeout=10).json().get('processos', []))
             if not selected_unity: summary['general_stats']['process_count'] += len(processes_to_scan)
+            
             for process in processes_to_scan:
                 transporters_to_scan = [selected_transporter] if selected_transporter else flatten_if_nested(requests.get(f"{API_BASE_URL}/cliente_info", params={'unidade': unity, 'processo': process}, timeout=10).json().get('transportadores', []))
                 if not selected_process: summary['general_stats']['transporter_count'] += len(transporters_to_scan)
+                
                 for transporter in transporters_to_scan:
                     barrel_res = requests.get(f"{API_BASE_URL}/cliente_info", params={'unidade': unity, 'processo': process, 'transportador': transporter}, timeout=10)
                     barrels = flatten_if_nested(barrel_res.json().get('IDs', []))
                     if not selected_transporter: summary['general_stats']['barrel_count'] += len(barrels)
+                    
                     for barrel_id in barrels:
                         params = {'unidade': unity, 'processo': process, 'transportador': transporter, 'ID': barrel_id}
                         info_res = requests.get(f"{API_BASE_URL}/tambor_info", params=params, timeout=10)
@@ -127,8 +156,10 @@ def get_summary_for_scope(selected_unity=None, selected_process=None, selected_t
                                 if section_values: summary['thickness_counts'][min(section_values)] += 1
         if selected_process: summary['general_stats']['process_count'] = 1
         if selected_transporter: summary['general_stats']['transporter_count'] = 1
+        
     except requests.exceptions.RequestException as e:
         print(f"ERRO durante a busca do resumo: {e}")
+        
     return summary
 
 
@@ -305,37 +336,68 @@ def delete_user():
 @app.route('/status')
 @login_required
 def status_page():
-    #print("--- [DEBUG] 4: carregou/status", flush=True)
+    # Inicializa o contexto com valores padrão
+    context = {
+        'title': 'Dashboard de Monitoramento', 'subtitle': 'Visão geral do sistema de tambores',
+        'unities': [], 'processes': [], 'transporters': [], 'barrels': [],
+        'selected_values': {},
+        'dashboard_data': {
+            'general_stats': {'unity_count': 0, 'process_count': 0, 'transporter_count': 0, 'barrel_count': 0},
+            'thickness_counts': {}, 'location_data': '[]', 'chart_data': '{}'
+        },
+        'error': None, 'maps_api_key': GOOGLE_MAPS_API_KEY, 'plate_styles': get_plate_styles()
+    }
+
+    # Parâmetros da URL
     selected_unity = request.args.get('unidade')
     selected_process = request.args.get('processo')
     selected_transporter = request.args.get('transportador')
     selected_barrel = request.args.get('tambor')
 
-    context = {
-        'title': 'Dashboard de Monitoramento', 'subtitle': 'Visão geral do sistema de tambores',
-        'unities': [], 'processes': [], 'transporters': [], 'barrels': [],
-        'selected_values': {'unidade': selected_unity, 'processo': selected_process, 'transportador': selected_transporter, 'tambor': selected_barrel},
-        'dashboard_data': {}, 'error': None, 'maps_api_key': GOOGLE_MAPS_API_KEY, 'plate_styles': get_plate_styles()
-    }
-    all_unities = []
-    try:
-        unities_response = requests.get(f"{API_BASE_URL}/cliente_info", timeout=5)
-        all_unities = flatten_if_nested(unities_response.json().get('unidades', []))
-    except requests.exceptions.RequestException:
-        context['error'] = "Erro ao buscar unidades."
+    # Permissões do usuário da sessão
+    user_level = session.get('level')
+    user_unidade_permitida = session.get('unidade')
+
+    # ==================================================================
+    # INÍCIO DA LÓGICA DE VALIDAÇÃO E PRÉ-SELEÇÃO
+    # ==================================================================
+    
+    # Se o usuário é comum (não admin)...
+    if user_level != 'administrador' and user_unidade_permitida != 'TODAS':
+        # E tentou acessar uma unidade pela URL que não é a sua...
+        if selected_unity and selected_unity != user_unidade_permitida:
+            flash("Você não tem permissão para acessar a unidade/processo/transportador ou tambor selecionado.", "error")
+            return render_template('status.html', **context)
         
-    user_unidade = session.get('unidade')
-    if session.get('level') == 'administrador' or user_unidade == 'TODAS':
-        context['unities'] = all_unities
-    elif user_unidade in all_unities:
-        context['unities'] = [user_unidade]
-    else:
-        context['unities'] = [] # Usuário não tem acesso a nenhuma unidade válida
+        # **A CORREÇÃO PRINCIPAL ESTÁ AQUI**
+        # Força a seleção para a unidade permitida, tratando o caso em que o usuário acessa /status sem parâmetros.
+        selected_unity = user_unidade_permitida
 
+    # Atualiza o dicionário de valores selecionados que será usado no template
+    context['selected_values'].update({
+        'unidade': selected_unity,
+        'processo': selected_process,
+        'transportador': selected_transporter,
+        'tambor': selected_barrel
+    })
+    
+    # ==================================================================
+    # FIM DA VALIDAÇÃO E PRÉ-SELEÇÃO
+    # ==================================================================
 
     try:
-        unities_response = requests.get(f"{API_BASE_URL}/cliente_info", timeout=5)
-        context['unities'] = flatten_if_nested(unities_response.json().get('unidades', []))
+        # A busca de dados agora usa a 'selected_unity' que foi previamente validada e definida
+        all_unities_response = requests.get(f"{API_BASE_URL}/cliente_info", timeout=5)
+        all_unities = flatten_if_nested(all_unities_response.json().get('unidades', []))
+
+        # Popula o dropdown de unidades com base na permissão
+        if user_level == 'administrador' or user_unidade_permitida == 'TODAS':
+            context['unities'] = all_unities
+        elif user_unidade_permitida in all_unities:
+            context['unities'] = [user_unidade_permitida]
+    
+    # A busca de dados detalhados prossegue normalmente, agora com a certeza
+    # de que a 'selected_unity' é permitida para o usuário.
         if selected_unity:
             process_response = requests.get(f"{API_BASE_URL}/cliente_info", params={'unidade': selected_unity}, timeout=5)
             context['processes'] = flatten_if_nested(process_response.json().get('processos', []))
@@ -369,11 +431,13 @@ def status_page():
                 }
             }
         else:
+            # Esta função agora só é chamada com parâmetros validados
             summary = get_summary_for_scope(selected_unity, selected_process, selected_transporter)
-            context['dashboard_data'] = {
-                'general_stats': summary['general_stats'], 'thickness_counts': summary['thickness_counts'],
-                'location_data': json.dumps(summary['locations']), 'plates_details': None, 'chart_data': '{}'
-            }
+            context['dashboard_data'].update({
+                'general_stats': summary['general_stats'],
+                'thickness_counts': summary['thickness_counts'],
+                'location_data': json.dumps(summary['locations']),
+            })
     except requests.exceptions.RequestException as e:
         context['error'] = f"Erro ao comunicar com a API: {e}"
     except Exception as e:
