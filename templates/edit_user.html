@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto max-w-2xl px-4 lg:px-6 py-8">
+    <div class="mb-6">
+        <a href="{{ url_for('manage_users_page') }}" class="text-blue-600 hover:underline flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+            Voltar para a lista de usuários
+        </a>
+    </div>
+    
+    <div class="bg-white p-8 rounded-xl shadow-lg">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Editar Usuário: <span class="text-indigo-600">{{ username }}</span></h1>
+        
+        <form action="{{ url_for('edit_user_page', username=username) }}" method="POST">
+            <div class="space-y-4">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">E-mail</label>
+                    <input type="email" name="email" value="{{ user.email }}" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" required>
+                </div>
+                 <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Nova Senha</label>
+                    <input type="password" name="password" placeholder="Deixe em branco para não alterar" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
+                <div>
+                    <label for="unidade" class="block text-sm font-medium text-gray-700">Unidade</label>
+                    <select name="unidade" class="mt-1 block w-full p-2 bg-white border border-gray-300 rounded-md shadow-sm">
+                        <option value="TODAS" {% if user.unidade == 'TODAS' %}selected{% endif %}>TODAS (Acesso Total)</option>
+                        {% for unity in unities %}
+                            <option value="{{ unity }}" {% if user.unidade == unity %}selected{% endif %}>{{ unity }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="level" class="block text-sm font-medium text-gray-700">Nível</label>
+                    <select name="level" class="mt-1 block w-full p-2 bg-white border border-gray-300 rounded-md shadow-sm">
+                        <option value="usuario" {% if user.level == 'usuario' %}selected{% endif %}>Usuário</option>
+                        <option value="administrador" {% if user.level == 'administrador' %}selected{% endif %}>Administrador</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-8 border-t pt-5">
+                <button type="submit" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 font-semibold transition duration-300">Salvar Alterações</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,15 +1,72 @@
-<header class="w-full bg-slate-800 shadow-md">
+<header class="w-full bg-slate-800 shadow-md sticky top-0 z-50">
     <div class="container mx-auto py-3 px-4 flex justify-between items-center">
-        <a href="{{ url_for('home') }}">
+        <a href="{{ url_for('status_page') }}">
             <img src="{{ url_for('static', filename='images/logo_vulcaflex.png') }}" alt="Logótipo da Vulcaflex" class="h-10" />
         </a>
 
-        <a href="#">
-            <img
-                src="{{ url_for('static', filename='images/avatar.svg') }}"
-                alt="Avatar do Utilizador"
-                class="w-10 h-10 rounded-full cursor-pointer"
-            />
-        </a>
+        <div class="relative">
+            <button id="avatarButton" class="block w-10 h-10 rounded-full overflow-hidden border-2 border-transparent focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <img src="{{ url_for('static', filename='images/avatar.svg') }}" alt="Avatar do Utilizador" class="w-full h-full object-cover" />
+            </button>
+            
+            <div id="avatarDropdown" 
+                 class="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-20 overflow-hidden border border-gray-200 
+                        transform transition-all duration-150 ease-out 
+                        opacity-0 scale-95 pointer-events-none">
+                
+                <div class="px-4 py-3 bg-gray-50 border-b">
+                    <p class="text-sm text-gray-800">Logado como</p>
+                    <p class="text-sm font-medium text-gray-900 truncate">{{ session.username or 'Usuário' }}</p>
+                </div>
+
+                <div class="py-1">
+                    {% if session.get('level') == 'administrador' %}
+                    <a href="{{ url_for('manage_users_page') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        <span>Gerenciar Usuários</span>
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('logout') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                        <span>Sair</span>
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
 </header>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const button = document.getElementById('avatarButton');
+    const dropdown = document.getElementById('avatarDropdown');
+
+    if (!button || !dropdown) return;
+
+    const toggleDropdown = (show) => {
+        if (show) {
+            dropdown.classList.remove('opacity-0', 'scale-95', 'pointer-events-none');
+        } else {
+            dropdown.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+        }
+    };
+
+    button.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isHidden = dropdown.classList.contains('opacity-0');
+        toggleDropdown(isHidden);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!dropdown.contains(e.target) && !button.contains(e.target)) {
+            toggleDropdown(false);
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            toggleDropdown(false);
+        }
+    });
+});
+</script>

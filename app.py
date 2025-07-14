@@ -6,7 +6,7 @@ from functools import wraps
 from collections import defaultdict
 from dotenv import load_dotenv
 from datetime import datetime, date
-print("--- [DEBUG] 1: Imports feitos", flush=True)
+#print("--- [DEBUG] 1: Imports feitos", flush=True)
 load_dotenv()
 
 app = Flask(__name__)
@@ -17,7 +17,39 @@ API_BASE_URL = "http://172.172.191.253"
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 ADMIN_USER = "administrador"
 ADMIN_PASS = "5959"
-print("--- [DEBUG] 2: variaveis carregadas", flush=True)
+#print("--- [DEBUG] 2: variaveis carregadas", flush=True)
+
+# --- Estrutura de Usuários (Em memória para este exemplo) ---
+# Em produção, isso seria um banco de dados
+USERS = {
+    'administrador': {"password": "5959", "level": "administrador", "email": "teste", "unidade": "TODAS"},
+    "llk": {"password": "123", "level": "usuario", "email": "teste1", "unidade": "BHTEC"},
+}
+#print("--- [DEBUG] 2: variaveis carregadas", flush=True)
+
+
+# --- Decorators de Autenticação ---
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            flash("Você precisa estar logado para ver esta página.", "warning")
+            return redirect(url_for('login_page'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            flash("Você precisa estar logado para ver esta página.", "warning")
+            return redirect(url_for('login_page'))
+        if session.get('level') != 'administrador':
+            flash("Você não tem permissão para acessar esta página.", "error")
+            return redirect(url_for('status_page'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 # --- Funções Auxiliares ---
 
 # Decorator para garantir que o usuário esteja logado
@@ -160,37 +192,120 @@ def prepare_history_chart_data(history_data, plate_code):
     }
 
 # --- Rotas da Aplicação ---
-    
-@app.route('/')
-def home():
-    print("--- [DEBUG] 3: carregou app flask", flush=True)
-    return redirect(url_for('status_page'))
-
 @app.route('/login', methods=['GET', 'POST'])
 def login_page():
-    error = None
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        # Verifica as credenciais com as variáveis já definidas no seu app.py
-        if username == ADMIN_USER and password == ADMIN_PASS:
+        user = USERS.get(username)
+
+        if user and user['password'] == password:
             session['logged_in'] = True
+            session['username'] = username
+            session['level'] = user['level']
+            session['unidade'] = user['unidade']
             flash('Login realizado com sucesso!', 'success')
             return redirect(url_for('status_page'))
         else:
-            error = 'Credenciais inválidas. Tente novamente.'
-    return render_template('login.html', error=error, title="Login")
+            flash('Credenciais inválidas. Tente novamente.', 'error')
+    return render_template('login.html', title="Login")
 
 @app.route('/logout')
+@login_required
 def logout():
-    session.pop('logged_in', None)
+    session.clear()
     flash('Você foi desconectado.', 'info')
     return redirect(url_for('login_page'))
+
+@app.route('/')
+def home():
+    #print("--- [DEBUG] 3: carregou app flask", flush=True)
+    return redirect(url_for('login_page'))
+
+# --- Rotas de Gerenciamento de Usuário ---
+@app.route('/admin/users')
+@admin_required
+def manage_users_page():
+    # Passa a lista de unidades para o template, para usar no formulário de adição
+    unities = []
+    try:
+        res = requests.get(f"{API_BASE_URL}/cliente_info", timeout=5)
+        unities = flatten_if_nested(res.json().get('unidades', []))
+    except requests.exceptions.RequestException as e:
+        flash(f"Não foi possível carregar as unidades da API: {e}", "error")
+    return render_template('manage_users.html', users=USERS, unities=unities, title="Gerenciar Usuários")
+
+@app.route('/admin/add_user', methods=['POST'])
+@admin_required
+def add_user():
+    username = request.form.get('username')
+    password = request.form.get('password')
+    level = request.form.get('level')
+    email = request.form.get('email')
+    unidade = request.form.get('unidade') # Novo campo
+    
+    if username in USERS:
+        flash(f"Usuário '{username}' já existe.", "error")
+    else:
+        USERS[username] = {"password": password, "level": level, "email": email, "unidade": unidade}
+        flash(f"Usuário '{username}' criado com sucesso.", "success")
+    return redirect(url_for('manage_users_page'))
+
+@app.route('/admin/edit_user/<username>', methods=['GET', 'POST'])
+@admin_required
+def edit_user_page(username):
+    user_to_edit = USERS.get(username)
+    if not user_to_edit:
+        flash("Usuário não encontrado.", "error")
+        return redirect(url_for('manage_users_page'))
+
+    if request.method == 'POST':
+        # Atualiza os dados
+        new_password = request.form.get('password')
+        user_to_edit['level'] = request.form.get('level')
+        user_to_edit['email'] = request.form.get('email')
+        user_to_edit['unidade'] = request.form.get('unidade')
+        
+        if new_password: # Só atualiza a senha se uma nova for fornecida
+            user_to_edit['password'] = new_password
+        
+        flash(f"Usuário '{username}' atualizado com sucesso.", "success")
+        return redirect(url_for('manage_users_page'))
+    
+    # Busca unidades para o dropdown do formulário de edição
+    unities = []
+    try:
+        res = requests.get(f"{API_BASE_URL}/cliente_info", timeout=5)
+        unities = flatten_if_nested(res.json().get('unidades', []))
+    except requests.exceptions.RequestException as e:
+        flash(f"Não foi possível carregar as unidades da API: {e}", "error")
+    
+    return render_template('edit_user.html', user=user_to_edit, username=username, unities=unities, title=f"Editar Usuário {username}")
+
+
+@app.route('/admin/delete_user', methods=['POST'])
+@admin_required
+def delete_user():
+    username = request.form.get('username')
+    
+    if username == session.get('username'):
+        flash("Você não pode remover seu próprio usuário.", "error")
+        return redirect(url_for('manage_users_page'))
+
+    if username in USERS:
+        del USERS[username]
+        flash(f"Usuário '{username}' removido com sucesso.", "success")
+    else:
+        flash(f"Usuário '{username}' não encontrado.", "error")
+        
+    return redirect(url_for('manage_users_page'))
+
+# --- Rotas de Consulta Protegidas ---
 
 @app.route('/status')
 @login_required
 def status_page():
-    print("--- [DEBUG] 4: carregou/status", flush=True)
+    #print("--- [DEBUG] 4: carregou/status", flush=True)
     selected_unity = request.args.get('unidade')
     selected_process = request.args.get('processo')
     selected_transporter = request.args.get('transportador')
@@ -202,6 +317,21 @@ def status_page():
         'selected_values': {'unidade': selected_unity, 'processo': selected_process, 'transportador': selected_transporter, 'tambor': selected_barrel},
         'dashboard_data': {}, 'error': None, 'maps_api_key': GOOGLE_MAPS_API_KEY, 'plate_styles': get_plate_styles()
     }
+    all_unities = []
+    try:
+        unities_response = requests.get(f"{API_BASE_URL}/cliente_info", timeout=5)
+        all_unities = flatten_if_nested(unities_response.json().get('unidades', []))
+    except requests.exceptions.RequestException:
+        context['error'] = "Erro ao buscar unidades."
+        
+    user_unidade = session.get('unidade')
+    if session.get('level') == 'administrador' or user_unidade == 'TODAS':
+        context['unities'] = all_unities
+    elif user_unidade in all_unities:
+        context['unities'] = [user_unidade]
+    else:
+        context['unities'] = [] # Usuário não tem acesso a nenhuma unidade válida
+
 
     try:
         unities_response = requests.get(f"{API_BASE_URL}/cliente_info", timeout=5)
@@ -256,7 +386,7 @@ def status_page():
 @app.route('/remove_tambor', methods=['POST'])
 @login_required
 def remove_barrel():
-    print("--- [DEBUG] 5: carregou/remove_tambor", flush=True)
+    #print("--- [DEBUG] 5: carregou/remove_tambor", flush=True)
     unidade = request.form.get('unidade')
     processo = request.form.get('processo')
     transportador = request.form.get('transportador')
@@ -273,7 +403,7 @@ def remove_barrel():
 @app.route('/relatorio/<unidade>/<processo>/<transportador>/<barrel_id>')
 @login_required
 def relatorio_tambor(unidade, processo, transportador, barrel_id):
-    print("--- [DEBUG] 6: carregou/relatorio_tambor", flush=True)
+    #print("--- [DEBUG] 6: carregou/relatorio_tambor", flush=True)
     drum_data = None
     error_message = None
     params = {'unidade': unidade, 'processo': processo, 'transportador': transportador, 'ID': barrel_id}
@@ -300,7 +430,7 @@ def relatorio_tambor(unidade, processo, transportador, barrel_id):
 @app.route('/historico')
 @login_required
 def historico_page():
-    print("--- [DEBUG] 7: carregou/historico", flush=True)
+    #print("--- [DEBUG] 7: carregou/historico", flush=True)
     # Captura todos os valores do formulário
     selected_unity = request.args.get('unidade')
     selected_process = request.args.get('processo')

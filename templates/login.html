@@ -30,6 +30,18 @@
                     <span class="text-sm">{{ error }}</span>
                 </div>
                 {% endif %}
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flex items-center gap-2 text-red-600 my-3 p-3 bg-red-100 border border-red-300 rounded-md">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-alert"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                                <span class="text-sm font-medium">{{ message }}</span>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+
 
                 <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 bg-orange-600 text-white hover:bg-orange-500 h-10 px-4 py-2 mt-8 w-full">
                     Acessar
