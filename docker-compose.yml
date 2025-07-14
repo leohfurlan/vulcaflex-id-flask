@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  flask-app:
+    image: vulcaflex-id-app:latest
+    networks:
+      - traefik-public
+    deploy:
+
+      restart_policy:
+        condition: on-failure
+      labels:
+
+        - "traefik.enable=true"
+        - "traefik.constraint-label=traefik-public"
+        - "traefik.docker.network=traefik-public"
+        - "traefik.http.routers.flask-app.rule=Host(`vulcaflex-id.atospd.com`)"
+        - "traefik.http.routers.flask-app.entrypoints=https"
+        - "traefik.http.routers.flask-app.tls.certresolver=le"
+        - "traefik.http.services.flask-app.loadbalancer.server.port=5000"
+
+networks:
+  traefik-public:
+    external: true

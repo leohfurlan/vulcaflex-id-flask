@@ -1,11 +1,12 @@
 import requests
 import os
 import json
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session
+from functools import wraps
 from collections import defaultdict
 from dotenv import load_dotenv
 from datetime import datetime, date
-
+print("--- [DEBUG] 1: Imports feitos", flush=True)
 load_dotenv()
 
 app = Flask(__name__)
@@ -16,8 +17,17 @@ API_BASE_URL = "http://172.172.191.253"
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 ADMIN_USER = "administrador"
 ADMIN_PASS = "5959"
-
+print("--- [DEBUG] 2: variaveis carregadas", flush=True)
 # --- Funções Auxiliares ---
+
+# Decorator para garantir que o usuário esteja logado
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            return redirect(url_for('login_page', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
 
 def flatten_if_nested(data_list):
     if not data_list or not isinstance(data_list, list): return []
@@ -153,10 +163,34 @@ def prepare_history_chart_data(history_data, plate_code):
     
 @app.route('/')
 def home():
+    print("--- [DEBUG] 3: carregou app flask", flush=True)
     return redirect(url_for('status_page'))
 
+@app.route('/login', methods=['GET', 'POST'])
+def login_page():
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        # Verifica as credenciais com as variáveis já definidas no seu app.py
+        if username == ADMIN_USER and password == ADMIN_PASS:
+            session['logged_in'] = True
+            flash('Login realizado com sucesso!', 'success')
+            return redirect(url_for('status_page'))
+        else:
+            error = 'Credenciais inválidas. Tente novamente.'
+    return render_template('login.html', error=error, title="Login")
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    flash('Você foi desconectado.', 'info')
+    return redirect(url_for('login_page'))
+
 @app.route('/status')
+@login_required
 def status_page():
+    print("--- [DEBUG] 4: carregou/status", flush=True)
     selected_unity = request.args.get('unidade')
     selected_process = request.args.get('processo')
     selected_transporter = request.args.get('transportador')
@@ -220,7 +254,9 @@ def status_page():
     return render_template('status.html', **context)
 
 @app.route('/remove_tambor', methods=['POST'])
+@login_required
 def remove_barrel():
+    print("--- [DEBUG] 5: carregou/remove_tambor", flush=True)
     unidade = request.form.get('unidade')
     processo = request.form.get('processo')
     transportador = request.form.get('transportador')
@@ -235,7 +271,9 @@ def remove_barrel():
     return redirect(url_for('status_page', unidade=unidade, processo=processo, transportador=transportador))
 
 @app.route('/relatorio/<unidade>/<processo>/<transportador>/<barrel_id>')
+@login_required
 def relatorio_tambor(unidade, processo, transportador, barrel_id):
+    print("--- [DEBUG] 6: carregou/relatorio_tambor", flush=True)
     drum_data = None
     error_message = None
     params = {'unidade': unidade, 'processo': processo, 'transportador': transportador, 'ID': barrel_id}
@@ -260,7 +298,9 @@ def relatorio_tambor(unidade, processo, transportador, barrel_id):
     )
 
 @app.route('/historico')
+@login_required
 def historico_page():
+    print("--- [DEBUG] 7: carregou/historico", flush=True)
     # Captura todos os valores do formulário
     selected_unity = request.args.get('unidade')
     selected_process = request.args.get('processo')
