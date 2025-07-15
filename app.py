@@ -68,11 +68,11 @@ def flatten_if_nested(data_list):
 
 def get_plate_styles():
     return {
-        10: {'text': 'text-green-600', 'border': 'border-green-600', 'label': '>10mm', 'color': '#16a34a'},
-        8: {'text': 'text-yellow-500', 'border': 'border-yellow-500', 'label': '<10mm', 'color': '#eab308'},
-        5: {'text': 'text-orange-400', 'border': 'border-orange-400', 'label': '<8mm', 'color': '#fb923c'},
-        0: {'text': 'text-red-600', 'border': 'border-red-600', 'label': '<5mm', 'color': '#dc2626'},
-        -1: {'text': 'text-gray-800', 'border': 'border-gray-800', 'label': 'Erro', 'color': '#1f2937'}
+        10: {'text': 'text-green-800', 'border': 'border-green-300', 'bg': 'bg-green-100', 'label': '>10mm', 'color': '#16a34a'},
+        8: {'text': 'text-yellow-800', 'border': 'border-yellow-300', 'bg': 'bg-yellow-100', 'label': '<10mm', 'color': '#eab308'},
+        5: {'text': 'text-orange-800', 'border': 'border-orange-300', 'bg': 'bg-orange-100', 'label': '<8mm', 'color': '#fb923c'},
+        0: {'text': 'text-red-800', 'border': 'border-red-300', 'bg': 'bg-red-100', 'label': '<5mm', 'color': '#dc2626'},
+        -1: {'text': 'text-gray-800', 'border': 'border-gray-400', 'bg': 'bg-gray-200', 'label': 'Erro', 'color': '#1f2937'}
     }
 
 def prepare_chart_data(plates_details, styles):

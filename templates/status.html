@@ -190,7 +190,7 @@
                                 <div class="plate-row grid grid-cols-4 gap-3 px-3 border border-gray-400 p-2 rounded-lg cursor-pointer hover:bg-gray-100" data-plate-code="{{ plate_code }}">
                                     <span class="self-center font-bold {{ plate_styles[min_thickness]['text'] }}">{{ plate_code }}</span>
                                     {% for secao, espessura in plate.secoes.items() %}
-                                    <div class="flex justify-center items-center border-2 {{ plate_styles[espessura]['border'] }} p-1 rounded-lg text-center">
+                                    <div class="flex justify-center items-center font-semibold border-2 p-1 rounded-lg text-center {{ plate_styles[espessura]['bg'] }} {{ plate_styles[espessura]['border'] }}">
                                         <span class="{{ plate_styles[espessura]['text'] }}">{{ plate_styles[espessura]['label'] }}</span>
                                     </div>
                                     {% endfor %}
